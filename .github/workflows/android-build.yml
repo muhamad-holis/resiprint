@@ -42,35 +42,37 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            # Path harus sama persis dengan "signingKey.path" di twa-manifest.json
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/android.keystore
           else
             echo "ANDROID_KEYSTORE_BASE64 belum diset di GitHub Secrets — build release akan gagal." >&2
           fi
 
-      - name: Build with Gradle (Debug APK)
+      - name: Build Debug (Bubblewrap build, tanpa signing)
         if: ${{ github.event.inputs.build_type != 'release' }}
         working-directory: android
         run: |
-          chmod +x gradlew || true
-          ./gradlew assembleDebug
+          # twa-manifest.json sudah ada, jadi "bubblewrap build" akan
+          # men-generate project Gradle (gradlew, app/, dll) SEKALIGUS
+          # meng-compile-nya. --skipSigning karena debug tidak butuh keystore.
+          bubblewrap build --skipPwaValidation --skipSigning
 
-      - name: Build with Gradle (Release AAB + APK)
+      - name: Build Release (Bubblewrap build, dengan signing)
         if: ${{ github.event.inputs.build_type == 'release' }}
         working-directory: android
         env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          chmod +x gradlew || true
-          ./gradlew bundleRelease assembleRelease
+          bubblewrap build --skipPwaValidation
 
       - name: Upload Debug APK
         if: ${{ github.event.inputs.build_type != 'release' }}
         uses: actions/upload-artifact@v4
         with:
           name: resiprint-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          # --skipSigning menghasilkan APK unsigned (bukan folder app/build/outputs)
+          path: android/app-release-unsigned-aligned.apk
 
       - name: Upload Release AAB & APK
         if: ${{ github.event.inputs.build_type == 'release' }}
@@ -78,5 +80,5 @@ jobs:
         with:
           name: resiprint-release-bundle
           path: |
-            android/app/build/outputs/bundle/release/*.aab
-            android/app/build/outputs/apk/release/*.apk
+            android/app-release-bundle.aab
+            android/app-release-signed.apk
