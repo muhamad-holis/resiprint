@@ -179,7 +179,12 @@ export function CropEditor({ sourceCanvas, initialRect, onChange }: CropEditorPr
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative flex h-[62vh] w-full touch-none items-center justify-center overflow-hidden rounded-2xl bg-secondary shadow-soft">
+      <div
+        className="relative flex h-[62vh] w-full touch-none items-center justify-center overflow-hidden rounded-2xl bg-secondary shadow-soft"
+        onTouchStart={onTouchStartZoom}
+        onTouchMove={onTouchMoveZoom}
+        onTouchEnd={onTouchEndZoom}
+      >
         {/*
           "stage" berukuran PERSIS sesuai rasio aspek gambar (bukan kotak 3:4 tetap),
           sehingga tidak ada ruang kosong (letterbox) di sekeliling gambar. Area crop
@@ -196,9 +201,6 @@ export function CropEditor({ sourceCanvas, initialRect, onChange }: CropEditorPr
             height: aspectRatio >= 1 ? "auto" : "100%",
             transform: `scale(${zoom})`,
           }}
-          onTouchStart={onTouchStartZoom}
-          onTouchMove={onTouchMoveZoom}
-          onTouchEnd={onTouchEndZoom}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
