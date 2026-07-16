@@ -1,0 +1,43 @@
+{
+  "packageId": "com.produkdigital.resiprint",
+  "host": "resiprint.app",
+  "name": "ResiPrint",
+  "launcherName": "ResiPrint",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#3D6EFF",
+  "themeColorDark": "#151F52",
+  "navigationColor": "#3D6EFF",
+  "navigationColorDark": "#151F52",
+  "navigationDividerColor": "#00000000",
+  "backgroundColor": "#F4F6FF",
+  "backgroundColorDark": "#0B1220",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://resiprint.app/icons/icon-512.png",
+  "maskableIconUrl": "https://resiprint.app/icons/icon-maskable-512.png",
+  "monochromeIconUrl": "https://resiprint.app/icons/icon-512.png",
+  "shortcuts": [
+    { "name": "Riwayat", "shortName": "Riwayat", "url": "/history", "chosenIconUrl": "https://resiprint.app/icons/icon-192.png" },
+    { "name": "Printer", "shortName": "Printer", "url": "/printer", "chosenIconUrl": "https://resiprint.app/icons/icon-192.png" }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://resiprint.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "playBilling": { "enabled": false }
+  },
+  "alphaDependencies": { "enabled": false },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://resiprint.app/",
+  "minSdkVersion": 21,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "resiprint-key"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shareTarget": null
+}

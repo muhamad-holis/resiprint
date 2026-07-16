@@ -1,0 +1,39 @@
+{
+  "name": "ResiPrint — Cetak Resi Marketplace",
+  "short_name": "ResiPrint",
+  "description": "Cetak resi Shopee, Tokopedia, Lazada, dan TikTok Shop langsung ke printer thermal Bluetooth. Offline, cepat, dan praktis.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6ff",
+  "theme_color": "#3d6eff",
+  "lang": "id-ID",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Upload Resi Baru",
+      "short_name": "Upload",
+      "url": "/?action=upload",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Riwayat",
+      "short_name": "Riwayat",
+      "url": "/history",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Printer",
+      "short_name": "Printer",
+      "url": "/printer",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
