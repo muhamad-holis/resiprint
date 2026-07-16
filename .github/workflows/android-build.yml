@@ -68,7 +68,7 @@ jobs:
 
       - name: Upload Debug APK
         if: ${{ github.event.inputs.build_type != 'release' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: resiprint-debug-apk
           # --skipSigning menghasilkan APK unsigned (bukan folder app/build/outputs)
@@ -76,7 +76,7 @@ jobs:
 
       - name: Upload Release AAB & APK
         if: ${{ github.event.inputs.build_type == 'release' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: resiprint-release-bundle
           path: |
