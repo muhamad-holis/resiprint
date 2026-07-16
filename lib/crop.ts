@@ -23,7 +23,7 @@ export function extractCroppedCanvas(source: HTMLCanvasElement, rect: CropRect):
   return out;
 }
 
-function rotateCanvas(source: HTMLCanvasElement, degrees: number): HTMLCanvasElement {
+export function rotateCanvas(source: HTMLCanvasElement, degrees: number): HTMLCanvasElement {
   const normalized = ((degrees % 360) + 360) % 360;
   const swapDims = normalized === 90 || normalized === 270;
 

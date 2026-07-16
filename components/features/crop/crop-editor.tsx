@@ -1,15 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RotateCw, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CropRect } from "@/types";
 import { cn } from "@/lib/utils";
+import { rotateCanvas } from "@/lib/crop";
 
 interface CropEditorProps {
-  imageSrc: string;
+  /** Canvas sumber (mis. hasil render halaman PDF) yang akan di-crop. */
+  sourceCanvas: HTMLCanvasElement;
   initialRect?: CropRect;
-  onChange: (rect: CropRect) => void;
+  /**
+   * Dipanggil setiap kali area crop berubah, ATAU setelah gambar diputar
+   * (workingCanvas berubah). rect.rotation akan selalu 0 karena rotasi
+   * sudah "dibakar" langsung ke workingCanvas agar posisi crop selalu presisi.
+   */
+  onChange: (rect: CropRect, workingCanvas: HTMLCanvasElement) => void;
 }
 
 type HandlePosition = "tl" | "tr" | "bl" | "br";
@@ -17,13 +24,21 @@ type HandlePosition = "tl" | "tr" | "bl" | "br";
 const HANDLES: HandlePosition[] = ["tl", "tr", "bl", "br"];
 const MIN_SIZE = 0.06;
 
-export function CropEditor({ imageSrc, initialRect, onChange }: CropEditorProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+export function CropEditor({ sourceCanvas, initialRect, onChange }: CropEditorProps) {
+  const stageRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(initialRect?.rotation ?? 0);
+
+  const [workingCanvas, setWorkingCanvas] = useState<HTMLCanvasElement>(sourceCanvas);
+  const [imageSrc, setImageSrc] = useState<string>(() => sourceCanvas.toDataURL("image/png"));
+
   const [rect, setRect] = useState<CropRect>(
-    initialRect ?? { x: 0.1, y: 0.1, width: 0.8, height: 0.4, rotation: 0 }
+    initialRect ? { ...initialRect, rotation: 0 } : { x: 0.1, y: 0.1, width: 0.8, height: 0.4, rotation: 0 }
   );
+
+  useEffect(() => {
+    setWorkingCanvas(sourceCanvas);
+    setImageSrc(sourceCanvas.toDataURL("image/png"));
+  }, [sourceCanvas]);
 
   const dragState = useRef<{
     mode: "move" | HandlePosition | null;
@@ -34,16 +49,25 @@ export function CropEditor({ imageSrc, initialRect, onChange }: CropEditorProps)
 
   const pinchState = useRef<{ initialDistance: number; initialZoom: number } | null>(null);
 
-  useEffect(() => {
-    onChange({ ...rect, rotation });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rect, rotation]);
+  const emitChange = useCallback(
+    (nextRect: CropRect, canvas: HTMLCanvasElement) => {
+      onChange({ ...nextRect, rotation: 0 }, canvas);
+    },
+    [onChange]
+  );
 
-  const getContainerBounds = useCallback(() => {
-    const el = containerRef.current;
+  useEffect(() => {
+    emitChange(rect, workingCanvas);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rect, workingCanvas]);
+
+  const aspectRatio = workingCanvas.width / Math.max(1, workingCanvas.height);
+
+  const getStageBounds = useCallback(() => {
+    const el = stageRef.current;
     if (!el) return { width: 1, height: 1 };
     const bounds = el.getBoundingClientRect();
-    return { width: bounds.width, height: bounds.height, left: bounds.left, top: bounds.top };
+    return { width: bounds.width, height: bounds.height };
   }, []);
 
   const clampRect = (r: CropRect): CropRect => {
@@ -52,7 +76,7 @@ export function CropEditor({ imageSrc, initialRect, onChange }: CropEditorProps)
     height = Math.max(MIN_SIZE, Math.min(1, height));
     x = Math.max(0, Math.min(1 - width, x));
     y = Math.max(0, Math.min(1 - height, y));
-    return { x, y, width, height, rotation: r.rotation };
+    return { x, y, width, height, rotation: 0 };
   };
 
   const onPointerDownRect = (e: React.PointerEvent, mode: "move" | HandlePosition) => {
@@ -64,9 +88,11 @@ export function CropEditor({ imageSrc, initialRect, onChange }: CropEditorProps)
   const onPointerMoveRect = (e: React.PointerEvent) => {
     const { mode, startX, startY, startRect } = dragState.current;
     if (!mode) return;
-    const bounds = getContainerBounds();
-    const dx = (e.clientX - startX) / bounds.width;
-    const dy = (e.clientY - startY) / bounds.height;
+    // Bagi delta dengan zoom juga, karena stage discale secara visual oleh CSS transform,
+    // sehingga 1px gerakan jari pada zoom 2x hanya menggeser 0.5px "nyata" pada stage.
+    const bounds = getStageBounds();
+    const dx = (e.clientX - startX) / (bounds.width * zoom);
+    const dy = (e.clientY - startY) / (bounds.height * zoom);
 
     const next: CropRect = { ...startRect };
 
@@ -128,68 +154,94 @@ export function CropEditor({ imageSrc, initialRect, onChange }: CropEditorProps)
     setRect((prev) => clampRect({ ...prev, width: widthRatio, height: heightRatio }));
   };
 
+  // Putar gambar 90 derajat secara fisik (bukan sekadar CSS), lalu reset area
+  // crop ke default. Dengan begini, koordinat crop di layar SELALU sama persis
+  // dengan piksel yang benar-benar akan dipakai untuk hasil cetak.
+  const handleRotate = () => {
+    const rotated = rotateCanvas(workingCanvas, 90);
+    setWorkingCanvas(rotated);
+    setImageSrc(rotated.toDataURL("image/png"));
+    setRect(clampRect({ x: 0.1, y: 0.1, width: 0.8, height: 0.4, rotation: 0 }));
+    setZoom(1);
+  };
+
+  const overlayClipPath = useMemo(
+    () => `polygon(
+      0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+      ${rect.x * 100}% ${rect.y * 100}%,
+      ${rect.x * 100}% ${(rect.y + rect.height) * 100}%,
+      ${(rect.x + rect.width) * 100}% ${(rect.y + rect.height) * 100}%,
+      ${(rect.x + rect.width) * 100}% ${rect.y * 100}%,
+      ${rect.x * 100}% ${rect.y * 100}%
+    )`,
+    [rect]
+  );
+
   return (
     <div className="flex flex-col gap-3">
-      <div
-        ref={containerRef}
-        className="relative aspect-[3/4] w-full touch-none overflow-hidden rounded-2xl bg-secondary shadow-soft"
-        onTouchStart={onTouchStartZoom}
-        onTouchMove={onTouchMoveZoom}
-        onTouchEnd={onTouchEndZoom}
-      >
+      <div className="relative flex h-[62vh] w-full touch-none items-center justify-center overflow-hidden rounded-2xl bg-secondary shadow-soft">
+        {/*
+          "stage" berukuran PERSIS sesuai rasio aspek gambar (bukan kotak 3:4 tetap),
+          sehingga tidak ada ruang kosong (letterbox) di sekeliling gambar. Area crop
+          & handle diposisikan sebagai anak dari stage yang sama, dan zoom diterapkan
+          ke seluruh stage (gambar + overlay + handle sekaligus) supaya semuanya
+          tetap presisi selaras pada level zoom berapa pun.
+        */}
         <div
-          className="absolute inset-0 flex items-center justify-center transition-transform duration-150"
-          style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
+          ref={stageRef}
+          className="relative max-h-full max-w-full origin-center transition-transform duration-150"
+          style={{
+            aspectRatio: `${workingCanvas.width} / ${workingCanvas.height}`,
+            width: aspectRatio >= 1 ? "100%" : "auto",
+            height: aspectRatio >= 1 ? "auto" : "100%",
+            transform: `scale(${zoom})`,
+          }}
+          onTouchStart={onTouchStartZoom}
+          onTouchMove={onTouchMoveZoom}
+          onTouchEnd={onTouchEndZoom}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imageSrc} alt="Preview resi" className="max-h-full max-w-full select-none object-contain" draggable={false} />
-        </div>
-
-        {/* Overlay gelap di luar area crop */}
-        <div className="pointer-events-none absolute inset-0">
-          <div
-            className="absolute inset-0 bg-black/45"
-            style={{
-              clipPath: `polygon(
-                0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
-                ${rect.x * 100}% ${rect.y * 100}%,
-                ${rect.x * 100}% ${(rect.y + rect.height) * 100}%,
-                ${(rect.x + rect.width) * 100}% ${(rect.y + rect.height) * 100}%,
-                ${(rect.x + rect.width) * 100}% ${rect.y * 100}%,
-                ${rect.x * 100}% ${rect.y * 100}%
-              )`,
-            }}
+          <img
+            src={imageSrc}
+            alt="Preview resi"
+            className="pointer-events-none absolute inset-0 h-full w-full select-none"
+            draggable={false}
           />
-        </div>
 
-        {/* Area crop */}
-        <div
-          className="absolute cursor-move border-2 border-primary"
-          style={{
-            left: `${rect.x * 100}%`,
-            top: `${rect.y * 100}%`,
-            width: `${rect.width * 100}%`,
-            height: `${rect.height * 100}%`,
-          }}
-          onPointerDown={(e) => onPointerDownRect(e, "move")}
-          onPointerMove={onPointerMoveRect}
-          onPointerUp={onPointerUpRect}
-        >
-          {HANDLES.map((pos) => (
-            <div
-              key={pos}
-              onPointerDown={(e) => onPointerDownRect(e, pos)}
-              onPointerMove={onPointerMoveRect}
-              onPointerUp={onPointerUpRect}
-              className={cn(
-                "absolute h-5 w-5 rounded-full border-2 border-primary bg-white shadow-soft",
-                pos === "tl" && "-left-2.5 -top-2.5 cursor-nwse-resize",
-                pos === "tr" && "-right-2.5 -top-2.5 cursor-nesw-resize",
-                pos === "bl" && "-bottom-2.5 -left-2.5 cursor-nesw-resize",
-                pos === "br" && "-bottom-2.5 -right-2.5 cursor-nwse-resize"
-              )}
-            />
-          ))}
+          {/* Overlay gelap di luar area crop */}
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute inset-0 bg-black/45" style={{ clipPath: overlayClipPath }} />
+          </div>
+
+          {/* Area crop */}
+          <div
+            className="absolute cursor-move border-2 border-primary"
+            style={{
+              left: `${rect.x * 100}%`,
+              top: `${rect.y * 100}%`,
+              width: `${rect.width * 100}%`,
+              height: `${rect.height * 100}%`,
+            }}
+            onPointerDown={(e) => onPointerDownRect(e, "move")}
+            onPointerMove={onPointerMoveRect}
+            onPointerUp={onPointerUpRect}
+          >
+            {HANDLES.map((pos) => (
+              <div
+                key={pos}
+                onPointerDown={(e) => onPointerDownRect(e, pos)}
+                onPointerMove={onPointerMoveRect}
+                onPointerUp={onPointerUpRect}
+                className={cn(
+                  "absolute h-5 w-5 rounded-full border-2 border-primary bg-white shadow-soft",
+                  pos === "tl" && "-left-2.5 -top-2.5 cursor-nwse-resize",
+                  pos === "tr" && "-right-2.5 -top-2.5 cursor-nesw-resize",
+                  pos === "bl" && "-bottom-2.5 -left-2.5 cursor-nesw-resize",
+                  pos === "br" && "-bottom-2.5 -right-2.5 cursor-nwse-resize"
+                )}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
@@ -201,7 +253,7 @@ export function CropEditor({ imageSrc, initialRect, onChange }: CropEditorProps)
           <Button variant="outline" size="icon" onClick={() => setZoom((z) => Math.min(3, z + 0.2))}>
             <ZoomIn className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => setRotation((r) => (r + 90) % 360)}>
+          <Button variant="outline" size="icon" onClick={handleRotate}>
             <RotateCw className="h-4 w-4" />
           </Button>
         </div>

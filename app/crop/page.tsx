@@ -15,7 +15,9 @@ import { toast } from "sonner";
 export default function CropPage() {
   const router = useRouter();
   const { croppedCanvas, cropRect, setCropRect, setCroppedCanvas, paperSize } = usePrintJobStore();
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [sourceCanvas, setSourceCanvas] = useState<HTMLCanvasElement | null>(null);
+  // Canvas kerja terbaru dari editor (bisa berbeda dari sourceCanvas jika sudah diputar).
+  const [workingCanvas, setWorkingCanvas] = useState<HTMLCanvasElement | null>(null);
   const [localRect, setLocalRect] = useState<CropRect>(
     cropRect ?? { x: 0.1, y: 0.08, width: 0.8, height: 0.35, rotation: 0 }
   );
@@ -28,13 +30,19 @@ export default function CropPage() {
       router.replace("/preview");
       return;
     }
-    setImageSrc(croppedCanvas.toDataURL("image/png"));
+    setSourceCanvas(croppedCanvas);
   }, [croppedCanvas, router]);
 
+  const handleEditorChange = (rect: CropRect, canvas: HTMLCanvasElement) => {
+    setLocalRect(rect);
+    setWorkingCanvas(canvas);
+  };
+
   const handleContinue = () => {
-    if (!croppedCanvas) return;
+    const base = workingCanvas ?? croppedCanvas;
+    if (!base) return;
     try {
-      const result = extractCroppedCanvas(croppedCanvas, localRect);
+      const result = extractCroppedCanvas(base, localRect);
       setCropRect(localRect);
       setCroppedCanvas(result);
       router.push("/print-preview");
@@ -54,7 +62,7 @@ export default function CropPage() {
     setPresetName("");
   };
 
-  if (!imageSrc) return null;
+  if (!sourceCanvas) return null;
 
   return (
     <main className="safe-top flex min-h-dvh flex-col bg-background">
@@ -73,7 +81,7 @@ export default function CropPage() {
       </header>
 
       <div className="flex-1 overflow-auto px-4 py-4">
-        <CropEditor imageSrc={imageSrc} initialRect={localRect} onChange={setLocalRect} />
+        <CropEditor sourceCanvas={sourceCanvas} initialRect={localRect} onChange={handleEditorChange} />
         <p className="mt-3 text-center text-xs text-muted-foreground">
           Geser untuk memindahkan, tarik titik biru untuk mengubah ukuran area crop
         </p>
