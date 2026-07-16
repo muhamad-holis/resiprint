@@ -1,14 +1,9 @@
 import { chunkBytes } from "@/lib/escpos";
 
-/**
- * Wrapper Web Bluetooth API untuk printer thermal ESC/POS.
- * Sebagian besar printer thermal murah menggunakan salah satu dari
- * dua service UUID umum berikut (SPP-over-BLE / generic serial).
- */
 const PRINTER_SERVICE_UUIDS = [
-  "000018f0-0000-1000-8000-00805f9b34fb", // umum: printer thermal generik
-  "0000ff00-0000-1000-8000-00805f9b34fb", // umum: modul serial BLE (HM-10 dsb)
-  "49535343-fe7d-4ae5-8fa9-9fafd205e455", // umum: modul serial ISSC
+  "000018f0-0000-1000-8000-00805f9b34fb",
+  "0000ff00-0000-1000-8000-00805f9b34fb",
+  "49535343-fe7d-4ae5-8fa9-9fafd205e455",
 ];
 
 const WRITE_CHARACTERISTIC_UUIDS = [
@@ -34,6 +29,7 @@ class BluetoothPrinterService {
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
   private listeners: Set<ConnectionListener> = new Set();
   private reconnectAttempted = false;
+  private manualDisconnect = false;
 
   isSupported(): boolean {
     return typeof navigator !== "undefined" && "bluetooth" in navigator;
@@ -145,6 +141,11 @@ class BluetoothPrinterService {
     this.characteristic = null;
     this.notifyListeners(false);
 
+    if (this.manualDisconnect) {
+      this.manualDisconnect = false;
+      return;
+    }
+
     const autoReconnect = localStorage.getItem("resiprint:autoReconnect") !== "false";
     if (autoReconnect && this.device && !this.reconnectAttempted) {
       this.reconnectAttempted = true;
@@ -158,6 +159,7 @@ class BluetoothPrinterService {
   };
 
   async disconnect(): Promise<void> {
+    this.manualDisconnect = true;
     if (this.device?.gatt?.connected) {
       this.device.gatt.disconnect();
     }

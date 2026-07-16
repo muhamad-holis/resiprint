@@ -147,10 +147,12 @@ export default function HomePage() {
                       className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                         item.status === "printed"
                           ? "bg-primary-50 text-primary"
-                          : "bg-secondary text-muted-foreground"
+                          : item.status === "failed"
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-secondary text-muted-foreground"
                       }`}
                     >
-                      {item.status === "printed" ? "Tercetak" : "PDF"}
+                      {item.status === "printed" ? "Tercetak" : item.status === "failed" ? "Gagal" : "Tersimpan"}
                     </span>
                   </CardContent>
                 </Card>
