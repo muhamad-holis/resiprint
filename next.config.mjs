@@ -9,37 +9,25 @@ const withPWA = withPWAInit({
     {
       urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
       handler: "CacheFirst",
-      options: {
-        cacheName: "google-fonts",
-        expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 365 },
-      },
+      options: { cacheName: "google-fonts", expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 365 } },
     },
     {
       urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
       handler: "CacheFirst",
-      options: {
-        cacheName: "images",
-        expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 30 },
-      },
+      options: { cacheName: "images", expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 30 } },
     },
-    {
-      urlPattern: /^\/_next\/static.*/i,
-      handler: "CacheFirst",
-      options: { cacheName: "next-static" },
-    },
-    {
-      urlPattern: /^\/$/,
-      handler: "NetworkFirst",
-      options: { cacheName: "start-url" },
-    },
+    { urlPattern: /^\/_next\/static.*/i, handler: "CacheFirst", options: { cacheName: "next-static" } },
+    { urlPattern: /^\/$/, handler: "NetworkFirst", options: { cacheName: "start-url" } },
   ],
 });
 
-/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   eslint: { ignoreDuringBuilds: false },
   images: { unoptimized: true },
+  turbopack: {
+    resolveAlias: { canvas: "./lib/empty-module.ts" },
+  },
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;
